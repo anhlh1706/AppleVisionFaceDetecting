@@ -9,6 +9,7 @@ import UIKit
 import Vision
 import Anchorage
 import AVFoundation
+import Combine
 
 final class ViewController: UIViewController, AVCaptureVideoDataOutputSampleBufferDelegate {
     
@@ -24,9 +25,20 @@ final class ViewController: UIViewController, AVCaptureVideoDataOutputSampleBuff
     
     private var overlayView: UIView!
     
+    private var verticalGradientView: UIView!
+    private var horizontalGradientView: UIView!
+    
     private var detects: [CounterView.DetectFace] = [] {
         didSet { runWaitting() }
     }
+    
+    private let defaultVerticalTransformation: CGFloat = -.pi / 2.2
+    private let defaultHorizontalTransformation: CGFloat = .pi / 2.2
+    
+    private let gradientLayer = CAGradientLayer()
+    private let gradientLayer2 = CAGradientLayer()
+    
+    private var cancellables = [AnyCancellable]()
     
     /// Waiting time between detections
     var isWaitting = false
@@ -62,8 +74,50 @@ final class ViewController: UIViewController, AVCaptureVideoDataOutputSampleBuff
         counterView.addSubview(overlayView)
         overlayView.edgeAnchors == counterView.edgeAnchors + 55
         
+        verticalGradientView = UIView()
+        counterView.addSubview(verticalGradientView)
+        verticalGradientView.edgeAnchors == counterView.edgeAnchors + 70
+        
+        horizontalGradientView = UIView()
+        counterView.addSubview(horizontalGradientView)
+        horizontalGradientView.edgeAnchors == counterView.edgeAnchors + 70
+        
         // MARK: - Setup View's Properties
         counterView.layer.zPosition = 3000
+    }
+    
+    func setupGradient() {
+        gradientLayer.removeFromSuperlayer()
+        gradientLayer.colors = [UIColor.blue.withAlphaComponent(0.5).cgColor, UIColor.clear.cgColor]
+        gradientLayer.locations = [0.0 , 0.35]
+        gradientLayer.startPoint = CGPoint(x: 0, y: 0)
+        gradientLayer.endPoint = CGPoint(x: 0, y: 1)
+        gradientLayer.frame = verticalGradientView.bounds
+        gradientLayer.cornerRadius = verticalGradientView.bounds.height / 2
+        verticalGradientView.layer.insertSublayer(gradientLayer, at: 0)
+        verticalGradientView.transform3D = CATransform3DMakeRotation(defaultVerticalTransformation, 1, 0, 0)
+        
+        gradientLayer2.removeFromSuperlayer()
+        gradientLayer2.colors = [UIColor.green.withAlphaComponent(0.5).cgColor, UIColor.clear.cgColor]
+        gradientLayer2.locations = [0.0 , 0.35]
+        gradientLayer2.startPoint = CGPoint(x: 0, y: 0)
+        gradientLayer2.endPoint = CGPoint(x: 1, y: 0)
+        gradientLayer2.frame = horizontalGradientView.bounds
+        gradientLayer.cornerRadius = horizontalGradientView.bounds.height / 2
+        horizontalGradientView.layer.insertSublayer(gradientLayer2, at: 0)
+        horizontalGradientView.transform3D = CATransform3DMakeRotation(defaultHorizontalTransformation, 0, 1, 0)
+        
+        verticalGradientView
+            .publisher(for: \.frame)
+            .map({ $0.height / 2 })
+            .assign(to: \.cornerRadius, on: verticalGradientView.layer)
+            .store(in: &cancellables)
+        
+        horizontalGradientView
+            .publisher(for: \.frame)
+            .map({ $0.height / 2 })
+            .assign(to: \.cornerRadius, on: horizontalGradientView.layer)
+            .store(in: &cancellables)
     }
     
     override func viewDidLayoutSubviews() {
@@ -71,7 +125,9 @@ final class ViewController: UIViewController, AVCaptureVideoDataOutputSampleBuff
         DispatchQueue.main.async { [self] in
             previewLayer.frame = overlayView.bounds
             previewLayer.cornerRadius = overlayView.bounds.height / 2
+            setupGradient()
         }
+        
     }
     
     func runWaitting() {
@@ -248,5 +304,4 @@ private extension ViewController {
         }
         return false
     }
-    
 }
